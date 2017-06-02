@@ -67,6 +67,7 @@ def run_tasks(initial_tasks, pool_size=None, tick=1):
 
     pending_tasks = set(initial_tasks)
     for task in initial_tasks:
+        task.check_circular_dependencies([])
         pending_tasks |= set(task.get_all_dependencies())
     done_tasks = set()
 
