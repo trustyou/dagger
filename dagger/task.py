@@ -48,6 +48,7 @@ class Task(object):
         in the dependencies resolution.
         It allows different threads to run visit on same object without
         influencing each-other dependencies checks.
+        If no visiting_list is passed it initializes a new one.
 
         :param visiting_list: list the list of already visited Tasks.
         :raises: CircularDependencyException
