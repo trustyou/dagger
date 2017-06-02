@@ -104,8 +104,7 @@ def run_partial_tasks(pending_tasks, done_tasks, pool_size=None, tick=1):
                 done_tasks.add(task)
             else:
                 logging.critical("Failed: %s", task)
-                logging.critical("Waiting for completion of: %d tasks",
-                                 num_tasks - len(pending_tasks) - len(done_tasks) - 1)
+                logging.critical("Waiting for completion of: %d tasks", num_tasks - len(pending_tasks) - len(done_tasks) - 1)
 
                 error_state["success"] = False
                 error_state["failed_tasks"].add(task)
