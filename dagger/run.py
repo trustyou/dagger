@@ -89,28 +89,44 @@ def run_partial_tasks(pending_tasks, done_tasks, pool_size=None, tick=1):
     }
 
     pool = multiprocessing.Pool(processes=pool_size)
+    attempted_tasks = set()
 
     def run_task(task):
         logging.info("Running: %s", task)
         pending_tasks.remove(task)
 
-        def task_done(res):
+        if task.retries_on_failure > 0:
+            attempted_tasks.add(task)
+
+        def task_done(success):
             """
-            :param res: True if the task execution was successful
+            :param success: True if the task execution was successful
             """
-            if res:
+            attempted_tasks.discard(task)
+
+            if success:
                 logging.info("Done: %s", task)
                 done_tasks.add(task)
-            else:
-                logging.critical("Failed: %s", task)
-                logging.critical("Waiting for completion of: %d tasks", num_tasks - len(pending_tasks) - len(done_tasks) - 1)
+                return
 
-                error_state["success"] = False
-                error_state["failed_tasks"].add(task)
+            logging.critical("Failed: %s", task)
+            logging.critical("Waiting for completion of: %d tasks",
+                             num_tasks - len(pending_tasks) - len(done_tasks) - 1)
 
-                if not error_state["pending_tasks"]:
-                    error_state["pending_tasks"] |= pending_tasks
-                pending_tasks.clear()
+            if task.retries_on_failure > 0:
+                # Retry the same task instance.  Note that any state change during the
+                # previous execution was done in a separate process, which allows us
+                # to restart it cleanly without failure left-overs.
+                task.retries_on_failure -= 1
+                pending_tasks.add(task)
+                return
+
+            error_state["success"] = False
+            error_state["failed_tasks"].add(task)
+
+            if not error_state["pending_tasks"]:
+                error_state["pending_tasks"] |= pending_tasks
+            pending_tasks.clear()
 
         pool.apply_async(_run_in_process, [task], callback=task_done)
         logging.info("Tasks Status: #pending %d\t#running %d\t#done %d\n",
@@ -119,7 +135,7 @@ def run_partial_tasks(pending_tasks, done_tasks, pool_size=None, tick=1):
                      len(done_tasks)
         )
 
-    while pending_tasks:
+    while pending_tasks or attempted_tasks:
         running_tasks = set(
             task for task in pending_tasks
             if all(dep in done_tasks for dep in task.dependencies)
