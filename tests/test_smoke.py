@@ -23,6 +23,7 @@ class IncTask(Task):
     """
     Increment a value in the shared array.
     """
+
     def run(self):
         array[self.config["index"]] += 1
 

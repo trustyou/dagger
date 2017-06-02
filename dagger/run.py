@@ -45,10 +45,10 @@ class DaggerException(Exception):
             "- done tasks: {num_done}\n"
             "- failed tasks: {failed}"
         ).format(
-                name=type(self).__name__,
-                num_pending=len(self.pending_tasks),
-                num_done=len(self.done_tasks),
-                failed=", ".join(str(task) for task in self.failed_tasks)
+            name=type(self).__name__,
+            num_pending=len(self.pending_tasks),
+            num_done=len(self.done_tasks),
+            failed=", ".join(str(task) for task in self.failed_tasks)
         )
 
 
@@ -67,7 +67,7 @@ def run_tasks(initial_tasks, pool_size=None, tick=1):
 
     pending_tasks = set(initial_tasks)
     for task in initial_tasks:
-        task.thread_safe_check_circular_dependencies([])
+        task.check_circular_dependencies([])
         pending_tasks |= set(task.get_all_dependencies())
     done_tasks = set()
 
@@ -119,12 +119,12 @@ def run_partial_tasks(pending_tasks, done_tasks, pool_size=None, tick=1):
                      len(pending_tasks),
                      num_tasks - len(pending_tasks) - len(done_tasks),
                      len(done_tasks)
-                     )
+        )
 
     while pending_tasks:
         running_tasks = set(
-                task for task in pending_tasks
-                if all(dep in done_tasks for dep in task.dependencies)
+            task for task in pending_tasks
+            if all(dep in done_tasks for dep in task.dependencies)
         )
         for task in running_tasks:
             run_task(task)

@@ -26,7 +26,6 @@ class Task(object):
         """
         self.config = config
         self.dependencies = dependencies
-        self.visiting = False
 
     def __str__(self):
         return "{0}".format(
@@ -43,7 +42,7 @@ class Task(object):
             all_deps += dep.get_all_dependencies()
         return all_deps
 
-    def thread_safe_check_circular_dependencies(self, visiting_list):
+    def check_circular_dependencies(self, visiting_list=None):
         """
         This method uses a list passed as parameter to check visited elements
         in the dependencies resolution.
@@ -53,6 +52,10 @@ class Task(object):
         :param visiting_list: list the list of already visited Tasks.
         :raises: CircularDependencyException
         """
+
+        if visiting_list is None:
+            visiting_list = []
+
         if self in visiting_list:
             raise CircularDependencyException(self)
         else:
@@ -60,7 +63,7 @@ class Task(object):
 
         for dep in self.dependencies:
             if dep not in visiting_list:
-                dep.thread_safe_check_circular_dependencies(visiting_list)
+                dep.check_circular_dependencies(visiting_list)
             else:
                 visiting_list.append(dep)
                 raise CircularDependencyException(visiting_list)
