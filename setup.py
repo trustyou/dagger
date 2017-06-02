@@ -27,6 +27,5 @@ setuptools.setup(
         "pytest"
     ],
     cmdclass={"test": PyTest},
-
     platforms="any",
 )
