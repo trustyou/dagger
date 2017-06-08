@@ -24,18 +24,6 @@ class ExtractTask(Task):
         # a task doing some important and long stuff
         array_extract[0] += 1
 
-
-
-def test_save_state():
-    """
-    test the pickling of tasks on a failure
-    """
-
-def test_recover_state():
-    """
-    test recovering state from a pickle
-    """
-
 def test_resume():
     """
     Test the option to persist DAG state across runs in case of failure of

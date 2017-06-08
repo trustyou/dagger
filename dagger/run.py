@@ -4,6 +4,7 @@ import multiprocessing
 import time
 
 import pickle
+
 from os.path import isfile
 from os import remove
 
@@ -12,21 +13,29 @@ def save_state(state, filename):
     :param state: dictionary containg current dag state
     :param filename: filename to save into
     """
-    logging.info("Saving DAG state into {filename}..")
+    logging.info("Saving DAG state into {}...".format(filename))
     with open(filename, 'wb') as writefile:
         pickle.dump(state, writefile)
-    logging.info("Done! Run 'run tasks' with 'resume' flag to pick up")
+    logging.info("Done! Run 'run tasks' with the same id flag to pick up")
 
 def load_state(filename):
     """
     :param filename: filename to read from
     :return: dictionary containing DAG state
     """
+    logging.info("Loading DAG state from {}...".format(filename))
+
     with open(filename, 'rb') as readfile:
         recovered_state = pickle.load(readfile)
-
     return recovered_state
 
+def get_filename(id_string):
+    """
+    :param id_string: id to turn into filename
+    :return: properly formated filename
+    """
+    id_string = id_string.replace(" ", "_")
+    return "{id_string}.dump"
 
 
 def _run_in_process(task):
@@ -94,10 +103,10 @@ def run_tasks(initial_tasks, pool_size=None, tick=1, resume_id = ''):
     :param resume_id: Id of the DAG to trigger resuming from an old state
     """
 
-    if resume_id and isfile('{}.dump'.format(resume_id)):
+    if resume_id and isfile(get_filename(resume_id)):
         # if we have an id set and a dump file, we try to resume from previous state
         logging.info("recovering from a previously saved state...")
-        recovered_state = load_state('{}.dump'.format(resume_id))
+        recovered_state = load_state(get_filename(resume_id))
         initial_tasks = recovered_state['pending_tasks'] | recovered_state['failed_tasks']
         done_tasks = recovered_state['done_tasks']
         pending_tasks = set(initial_tasks)
@@ -172,17 +181,17 @@ def run_partial_tasks(pending_tasks, done_tasks, pool_size=None, tick=1, resume_
 
     if error_state["success"]:
         logging.info("All tasks are done!")
-        if resume_id:
-            # if we successfully completed everything, remove the dump
+        if resume_id and isfile(get_filename(resume_id)):
+            # if we successfully completed everything, remove the dump if its present
             logging.info("Removing previously created state")
-            remove('{}.dump'.format(resume_id))
+            remove(get_filename(resume_id))
         return True
 
     logging.critical("Tasks execution failed")
     error_state["done_tasks"] |= done_tasks
 
-    # pickle the state to resume from it later if the flag is set
     if resume_id:
-        save_state(error_state, '{}.dump'.format(resume_id))
+        # pickle the state to resume from it later if the id is provided
+        save_state(error_state, get_filename(resume_id))
 
     raise DaggerException(error_state["pending_tasks"], error_state["done_tasks"], error_state["failed_tasks"])
