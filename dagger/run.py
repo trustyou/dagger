@@ -3,6 +3,31 @@ import multiprocessing
 
 import time
 
+import pickle
+from os.path import isfile
+from os import remove
+
+def save_state(state, filename):
+    """
+    :param state: dictionary containg current dag state
+    :param filename: filename to save into
+    """
+    logging.info("Saving DAG state into {filename}..")
+    with open(filename, 'wb') as writefile:
+        pickle.dump(state, writefile)
+    logging.info("Done! Run 'run tasks' with 'resume' flag to pick up")
+
+def load_state(filename):
+    """
+    :param filename: filename to read from
+    :return: dictionary containing DAG state
+    """
+    with open(filename, 'rb') as readfile:
+        recovered_state = pickle.load(readfile)
+
+    return recovered_state
+
+
 
 def _run_in_process(task):
     """
@@ -52,7 +77,7 @@ class DaggerException(Exception):
         )
 
 
-def run_tasks(initial_tasks, pool_size=None, tick=1):
+def run_tasks(initial_tasks, pool_size=None, tick=1, resume_id = ''):
     """
     Run tasks, guaranteeing that their dependencies will be run before them. Work is distributed in a process pool to
     profit from parallelization.
@@ -60,21 +85,34 @@ def run_tasks(initial_tasks, pool_size=None, tick=1):
     If one of the tasks fails, all currently running tasks will be run to completion. Afterwards, a DaggerException is
     raised, containing sets of completed, pending and failed tasks.
 
+    If the resume id is set the next time run_tasks with the same id is called, Dagger will try to pick up the
+    previous state and skip running all the tasks that were completed last time.
+
     :param initial_tasks: Iterable of Task instances.
     :param pool_size: Size of process pool. Default is the number of CPUs
     :param tick: Frequency of dagger ticks in seconds
+    :param resume_id: Id of the DAG to trigger resuming from an old state
     """
 
-    pending_tasks = set(initial_tasks)
-    for task in initial_tasks:
-        task.check_circular_dependencies([])
-        pending_tasks |= set(task.get_all_dependencies())
-    done_tasks = set()
+    if resume_id and isfile('{}.dump'.format(resume_id)):
+        # if we have an id set and a dump file, we try to resume from previous state
+        logging.info("recovering from a previously saved state...")
+        recovered_state = load_state('{}.dump'.format(resume_id))
+        initial_tasks = recovered_state['pending_tasks'] | recovered_state['failed_tasks']
+        done_tasks = recovered_state['done_tasks']
+        pending_tasks = set(initial_tasks)
+    else:
+        # if not, we start from scratch
+        pending_tasks = set(initial_tasks)
+        done_tasks = set()
+        for task in initial_tasks:
+            task.check_circular_dependencies([])
+            pending_tasks |= set(task.get_all_dependencies())
 
-    return run_partial_tasks(pending_tasks, done_tasks, pool_size, tick)
+    return run_partial_tasks(pending_tasks, done_tasks, pool_size, tick, resume_id)
 
 
-def run_partial_tasks(pending_tasks, done_tasks, pool_size=None, tick=1):
+def run_partial_tasks(pending_tasks, done_tasks, pool_size=None, tick=1, resume_id = ''):
     """
     Run a graph of tasks where some are already finished. Useful for attempting a rerun of a failed dagger execution.
     """
@@ -134,8 +172,17 @@ def run_partial_tasks(pending_tasks, done_tasks, pool_size=None, tick=1):
 
     if error_state["success"]:
         logging.info("All tasks are done!")
+        if resume_id:
+            # if we successfully completed everything, remove the dump
+            logging.info("Removing previously created state")
+            remove('{}.dump'.format(resume_id))
         return True
 
     logging.critical("Tasks execution failed")
     error_state["done_tasks"] |= done_tasks
+
+    # pickle the state to resume from it later if the flag is set
+    if resume_id:
+        save_state(error_state, '{}.dump'.format(resume_id))
+
     raise DaggerException(error_state["pending_tasks"], error_state["done_tasks"], error_state["failed_tasks"])
