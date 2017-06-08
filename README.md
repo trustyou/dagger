@@ -10,16 +10,22 @@ Tasks are run in a process pool of configurable size.
 You define tasks by subclassing `Task`:
 
     class DoStuff(Task):
-    
+
         def run(self):
             print("Look at me, I'm runniiiiiing ...")
-            
+
 Tasks accept two parameters during creation
 
 * `config`: Something picklable to customize the tasks behavior at runtime
 * `dependencies`: A list of `Task` instances that need to be done before we start this task
 
 If task execution fails, a `DaggerException` is raised, with information about which tasks completed
-and which failed.
+and which failed. There is also a possibility to make Dagger resume execution of a failed task graphs
+from the point of failure by assigning tasks unique ids:
+
+`
+run_tasks([awesome_task, very_awesome_task], resume_id = "awesome_tasks")
+`
+
 
 See also [examples folder](dagger/examples).
