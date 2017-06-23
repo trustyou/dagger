@@ -19,13 +19,18 @@ class Task(object):
     leads to undefined behavior.
     """
 
-    def __init__(self, config, dependencies=[]):
+    # default number of retries that subclasses can set for their failure mitigation
+    DEFAULT_RETRIES = 0
+
+    def __init__(self, config, dependencies=[], retries=None):
         """
         :param config: Picklable data that defines this task's behavior
         :param dependencies: List of tasks that this task depends on
+        :param retries: The number of times the task should be retried on failure
         """
         self.config = config
         self.dependencies = dependencies
+        self.retries_on_failure = self.DEFAULT_RETRIES if retries is None else retries
 
     def __str__(self):
         return "{0}".format(
